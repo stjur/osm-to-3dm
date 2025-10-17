@@ -23,7 +23,7 @@ import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 import rhino3dm
 
@@ -38,7 +38,8 @@ class Feature:
     """A single extrudable OSM footprint."""
 
     osm_id: str
-    rings: List[List[Tuple[float, float]]]
+    outer: List[Tuple[float, float]]
+    holes: List[List[Tuple[float, float]]]
     tags: Dict[str, str]
 
     @property
@@ -176,7 +177,7 @@ def extract_way_feature(
         ring = [nodes[nid] for nid in node_refs]
     except KeyError:
         return None
-    return Feature(osm_id=f"way/{way_id}", rings=[ring], tags=tags)
+    return Feature(osm_id=f"way/{way_id}", outer=ring, holes=[], tags=tags)
 
 
 def assemble_rings(node_sequences: Iterable[Sequence[int]]) -> List[List[int]]:
@@ -253,13 +254,73 @@ def extract_relation_features(
     if not way_roles["outer"]:
         return []
 
-    features: List[Feature] = []
+    outer_rings: List[List[Tuple[float, float]]] = []
     for ring_node_ids in assemble_rings(way_roles["outer"]):
         try:
             ring = [nodes[nid] for nid in ring_node_ids]
         except KeyError:
             continue
-        features.append(Feature(osm_id=f"relation/{relation_id}", rings=[ring], tags=outer_tags))
+        outer_rings.append(ring)
+
+    if not outer_rings:
+        return []
+
+    inner_rings: List[List[Tuple[float, float]]] = []
+    for ring_node_ids in assemble_rings(way_roles["inner"]):
+        try:
+            ring = [nodes[nid] for nid in ring_node_ids]
+        except KeyError:
+            continue
+        inner_rings.append(ring)
+
+    def ring_centroid(ring: Sequence[Tuple[float, float]]) -> Tuple[float, float]:
+        if not ring:
+            return 0.0, 0.0
+        lat_sum = 0.0
+        lon_sum = 0.0
+        count = 0
+        for lat, lon in ring:
+            lat_sum += lat
+            lon_sum += lon
+            count += 1
+        return lat_sum / count, lon_sum / count
+
+    def ring_contains_point(ring: Sequence[Tuple[float, float]], point: Tuple[float, float]) -> bool:
+        # Use the ray casting algorithm on longitude/latitude pairs.
+        px, py = point[1], point[0]
+        inside = False
+        for (lat1, lon1), (lat2, lon2) in zip(ring, ring[1:]):
+            x1, y1 = lon1, lat1
+            x2, y2 = lon2, lat2
+            intersects = ((y1 > py) != (y2 > py)) and (
+                px < (x2 - x1) * (py - y1) / ((y2 - y1) or 1e-12) + x1
+            )
+            if intersects:
+                inside = not inside
+        return inside
+
+    unassigned_inners = list(inner_rings)
+    features: List[Feature] = []
+
+    for outer_ring in outer_rings:
+        assigned: List[List[Tuple[float, float]]] = []
+        remaining_inners: List[List[Tuple[float, float]]] = []
+        for inner_ring in unassigned_inners:
+            centroid = ring_centroid(inner_ring)
+            if ring_contains_point(outer_ring, centroid):
+                assigned.append(inner_ring)
+            else:
+                remaining_inners.append(inner_ring)
+        unassigned_inners = remaining_inners
+        features.append(
+            Feature(
+                osm_id=f"relation/{relation_id}",
+                outer=outer_ring,
+                holes=assigned,
+                tags=outer_tags,
+            )
+        )
+
     return features
 
 
@@ -310,8 +371,11 @@ def determine_origin(features: Sequence[Feature]) -> Tuple[float, float]:
     latitudes: List[float] = []
     longitudes: List[float] = []
     for feature in features:
-        for ring in feature.rings:
-            for lat, lon in ring:
+        for lat, lon in feature.outer:
+            latitudes.append(lat)
+            longitudes.append(lon)
+        for hole in feature.holes:
+            for lat, lon in hole:
                 latitudes.append(lat)
                 longitudes.append(lon)
     if not latitudes:
@@ -332,29 +396,102 @@ def project_point(lat: float, lon: float, origin_lat: float, origin_lon: float) 
 
 def project_feature(feature: Feature, origin: Tuple[float, float]) -> Feature:
     origin_lat, origin_lon = origin
-    projected_rings: List[List[Tuple[float, float]]] = []
-    for ring in feature.rings:
-        projected_rings.append([project_point(lat, lon, origin_lat, origin_lon) for lat, lon in ring])
-    return Feature(osm_id=feature.osm_id, rings=projected_rings, tags=feature.tags)
+    projected_outer = [
+        project_point(lat, lon, origin_lat, origin_lon) for lat, lon in feature.outer
+    ]
+    projected_holes = [
+        [project_point(lat, lon, origin_lat, origin_lon) for lat, lon in ring]
+        for ring in feature.holes
+    ]
+    return Feature(
+        osm_id=feature.osm_id,
+        outer=projected_outer,
+        holes=projected_holes,
+        tags=feature.tags,
+    )
 
 
-def create_extrusion_from_ring(
+def _ring_signed_area(ring: Sequence[Tuple[float, float]]) -> float:
+    area = 0.0
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+        area += (x1 * y2) - (x2 * y1)
+    return area * 0.5
+
+
+def _prepare_ring_points(
     ring: Sequence[Tuple[float, float]],
-    height: float,
-    min_height: float,
-) -> Optional[rhino3dm.Extrusion]:
+    *,
+    counter_clockwise: bool,
+) -> Optional[List[rhino3dm.Point3d]]:
     if len(ring) < 4:
         return None
-    polyline = rhino3dm.Polyline(
-        [rhino3dm.Point3d(x, y, 0.0) for x, y in ring]
-    )
-    if not polyline.IsClosed:
-        polyline.Add(polyline[0])
-    curve = polyline.ToNurbsCurve()
+
+    closed_ring: List[Tuple[float, float]] = list(ring)
+    if closed_ring[0] != closed_ring[-1]:
+        closed_ring.append(closed_ring[0])
+
+    area = _ring_signed_area(closed_ring)
+    if counter_clockwise and area < 0:
+        closed_ring.reverse()
+    elif not counter_clockwise and area > 0:
+        closed_ring.reverse()
+
+    points = [rhino3dm.Point3d(x, y, 0.0) for x, y in closed_ring]
+    if points[0].DistanceTo(points[-1]) > 1e-6:
+        points.append(points[0])
+    if len(points) < 4:
+        return None
+    return points
+
+
+def _polyline_curve_from_ring(
+    ring: Sequence[Tuple[float, float]],
+    *,
+    counter_clockwise: bool,
+) -> Optional[rhino3dm.NurbsCurve]:
+    points = _prepare_ring_points(ring, counter_clockwise=counter_clockwise)
+    if points is None:
+        return None
+    curve = rhino3dm.PolylineCurve(points)
+    if not curve.IsClosed:
+        return None
+    return curve.ToNurbsCurve()
+
+
+def create_geometry_from_feature(
+    feature: Feature,
+    height: float,
+    min_height: float,
+) -> Optional[Union[rhino3dm.Extrusion, rhino3dm.Brep]]:
     extrusion_height = height - min_height
     if extrusion_height <= 0:
         return None
-    extrusion = rhino3dm.Extrusion.Create(curve, extrusion_height, True)
+
+    outer_curve = _polyline_curve_from_ring(feature.outer, counter_clockwise=True)
+    if outer_curve is None:
+        return None
+
+    hole_curves: List[rhino3dm.NurbsCurve] = []
+    for hole in feature.holes:
+        curve = _polyline_curve_from_ring(hole, counter_clockwise=False)
+        if curve is not None:
+            hole_curves.append(curve)
+
+    if hole_curves:
+        planar = rhino3dm.Brep.CreatePlanarBreps([outer_curve, *hole_curves])
+        if not planar:
+            return None
+        base = planar[0]
+        solid = base.Faces[0].CreateExtrusion(
+            rhino3dm.Vector3d(0.0, 0.0, extrusion_height),
+            True,
+        )
+        if solid is None:
+            return None
+        solid.Translate(rhino3dm.Vector3d(0.0, 0.0, min_height))
+        return solid
+
+    extrusion = rhino3dm.Extrusion.Create(outer_curve, extrusion_height, True)
     if extrusion is None:
         return None
     extrusion.Translate(rhino3dm.Vector3d(0.0, 0.0, min_height))
@@ -367,17 +504,19 @@ def add_feature_to_model(
     height: float,
     min_height: float,
 ) -> None:
-    for ring in feature.rings:
-        extrusion = create_extrusion_from_ring(ring, height, min_height)
-        if extrusion is None:
-            continue
-        attributes = rhino3dm.ObjectAttributes()
-        attributes.Name = feature.name or feature.osm_id
-        for key, value in feature.tags.items():
-            if key.startswith("building") or key in {"height", "min_height", "name"}:
-                attributes.SetUserString(key, value)
-        attributes.SetUserString("osm:id", feature.osm_id)
-        model.Objects.AddExtrusion(extrusion, attributes)
+    geometry = create_geometry_from_feature(feature, height, min_height)
+    if geometry is None:
+        return
+    attributes = rhino3dm.ObjectAttributes()
+    attributes.Name = feature.name or feature.osm_id
+    for key, value in feature.tags.items():
+        if key.startswith("building") or key in {"height", "min_height", "name"}:
+            attributes.SetUserString(key, value)
+    attributes.SetUserString("osm:id", feature.osm_id)
+    if isinstance(geometry, rhino3dm.Extrusion):
+        model.Objects.AddExtrusion(geometry, attributes)
+    else:
+        model.Objects.AddBrep(geometry, attributes)
 
 
 def build_model(

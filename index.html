@@ -99,43 +99,56 @@
 
       <section class="callout">
         <p>
-          This project runs entirely on your computer. GitHub Pages hosts these
-          instructions, but the actual conversion happens when you execute the
-          Python script locally.
+          Drop an OpenStreetMap <code>.osm</code> file onto the
+          <a href="viewer.html">browser converter</a> to generate a Rhino
+          <code>.3dm</code> model instantly. Everything stays on your device —
+          no uploads, no installs.
         </p>
       </section>
 
       <section>
-        <h2>1. Install the dependencies</h2>
+        <h2>Convert directly in your browser</h2>
+        <ol>
+          <li>
+            Export an <code>.osm</code> file that includes
+            <code>building</code> or <code>building:part</code> geometry from
+            <a href="https://www.openstreetmap.org/export">openstreetmap.org</a>.
+          </li>
+          <li>
+            Open the <a href="viewer.html">web converter &amp; viewer</a> and
+            drop the file onto the page.
+          </li>
+          <li>
+            Inspect the generated building volumes immediately in 3D and use the
+            “Download 3DM” button to save the Rhino model.
+          </li>
+        </ol>
         <p>
-          The converter depends on the
-          <a href="https://github.com/mcneel/rhino3dm">rhino3dm</a> bindings. Use
-          <code>pip</code> inside your Python environment:
+          The conversion runs entirely in your browser using WebAssembly — large
+          files never leave your machine.
         </p>
-        <pre><code>pip install rhino3dm</code></pre>
       </section>
 
       <section>
-        <h2>2. Grab some building data</h2>
+        <h2>Prefer the command line?</h2>
+        <ol>
+          <li>
+            Install the <a href="https://github.com/mcneel/rhino3dm">rhino3dm</a>
+            Python bindings:
+            <pre><code>pip install rhino3dm</code></pre>
+          </li>
+          <li>
+            Export an <code>.osm</code> file with the buildings you care about.
+          </li>
+          <li>
+            Run the converter script:
+            <pre><code>python osm_to_3dm.py input.osm output.3dm</code></pre>
+          </li>
+        </ol>
         <p>
-          Export an <code>.osm</code> file from
-          <a href="https://www.openstreetmap.org/export">openstreetmap.org</a>
-          that contains <code>building</code> or <code>building:part</code>
-          elements. Both polygons and multipolygons are supported, including
-          relations with inner courtyards.
-        </p>
-      </section>
-
-      <section>
-        <h2>3. Run the converter</h2>
-        <p>
-          With Python 3.9+ available, execute the script from this repository:
-        </p>
-        <pre><code>python osm_to_3dm.py input.osm output.3dm</code></pre>
-        <p>
-          Optional switches let you control the fallback building height and the
-          assumed storey height when only <code>building:levels</code> is
-          provided.
+          Flags such as <code>--default-height</code> and
+          <code>--level-height</code> let you tweak how missing OSM attributes are
+          interpreted.
         </p>
       </section>
 

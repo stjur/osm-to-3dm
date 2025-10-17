@@ -7,7 +7,7 @@ volumes.
 ## Convert in your browser
 
 The repository ships with a WebAssembly-powered converter so you can try the
-workflow without installing anything:
+workflow without installing anything: 
 
 1. Export an area from OpenStreetMap that contains `building=*` or
    `building:part=*` features.

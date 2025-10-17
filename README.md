@@ -37,6 +37,10 @@ avoid projection distortions, and writes one extrusion per footprint to the
 output 3DM file. Basic metadata (such as the source OSM identifier and the
 projection origin) is embedded into the file for future reference.
 
+To inspect the result without Rhino, open `viewer.html` (or visit the GitHub
+Pages deployment) and drop the generated `.3dm` file into the browser-based
+viewer.
+
 ## GitHub Pages quick-start
 
 If you want a simple landing page at

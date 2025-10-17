@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>osm-to-3dm converter</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        line-height: 1.6;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: radial-gradient(circle at top, rgba(53, 132, 228, 0.15), transparent 55%),
+          linear-gradient(180deg, rgba(240, 240, 240, 0.6), transparent 60%);
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 4rem;
+      }
+      h1 {
+        font-size: clamp(2rem, 5vw, 2.8rem);
+        margin-bottom: 0.25em;
+      }
+      h2 {
+        font-size: clamp(1.4rem, 3.5vw, 1.8rem);
+        margin-top: 2.5rem;
+        border-bottom: 2px solid rgba(53, 132, 228, 0.25);
+        padding-bottom: 0.35rem;
+      }
+      p {
+        margin: 0.75rem 0;
+      }
+      ol, ul {
+        padding-left: 1.5rem;
+      }
+      code {
+        font-family: "Fira Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+        background: rgba(53, 132, 228, 0.15);
+        padding: 0.1rem 0.35rem;
+        border-radius: 0.35rem;
+      }
+      pre {
+        background: rgba(12, 18, 28, 0.85);
+        color: #f4f7ff;
+        padding: 1rem 1.25rem;
+        border-radius: 0.5rem;
+        overflow-x: auto;
+      }
+      a {
+        color: #2a6bf2;
+      }
+      .callout {
+        background: rgba(53, 132, 228, 0.12);
+        border-left: 4px solid rgba(53, 132, 228, 0.65);
+        padding: 1rem 1.25rem;
+        border-radius: 0.5rem;
+        margin: 1.5rem 0;
+      }
+      footer {
+        margin-top: 4rem;
+        font-size: 0.9rem;
+        color: rgba(0, 0, 0, 0.6);
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: radial-gradient(circle at top, rgba(38, 112, 202, 0.3), transparent 60%),
+            linear-gradient(180deg, rgba(32, 37, 48, 0.75), rgba(17, 20, 27, 0.95));
+          color: #f8fbff;
+        }
+        h2 {
+          border-bottom-color: rgba(102, 154, 247, 0.45);
+        }
+        a {
+          color: #92b7ff;
+        }
+        .callout {
+          background: rgba(74, 118, 212, 0.2);
+          border-left-color: rgba(110, 162, 255, 0.9);
+        }
+        footer {
+          color: rgba(255, 255, 255, 0.55);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>osm-to-3dm converter</h1>
+        <p>
+          A tiny utility that turns OpenStreetMap building footprints into Rhino
+          <code>.3dm</code> volumes.
+        </p>
+      </header>
+
+      <section class="callout">
+        <p>
+          Drop an OpenStreetMap <code>.osm</code> file onto the
+          <a href="viewer.html">browser converter</a> to generate a Rhino
+          <code>.3dm</code> model instantly. Everything stays on your device —
+          no uploads, no installs.
+        </p>
+      </section>
+
+      <section>
+        <h2>Convert directly in your browser</h2>
+        <ol>
+          <li>
+            Export an <code>.osm</code> file that includes
+            <code>building</code> or <code>building:part</code> geometry from
+            <a href="https://www.openstreetmap.org/export">openstreetmap.org</a>.
+          </li>
+          <li>
+            Open the <a href="viewer.html">web converter &amp; viewer</a> and
+            drop the file onto the page.
+          </li>
+          <li>
+            Inspect the generated building volumes immediately in 3D and use the
+            “Download 3DM” button to save the Rhino model.
+          </li>
+        </ol>
+        <p>
+          The conversion runs entirely in your browser using WebAssembly — large
+          files never leave your machine.
+        </p>
+      </section>
+
+      <section>
+        <h2>Prefer the command line?</h2>
+        <ol>
+          <li>
+            Install the <a href="https://github.com/mcneel/rhino3dm">rhino3dm</a>
+            Python bindings:
+            <pre><code>pip install rhino3dm</code></pre>
+          </li>
+          <li>
+            Export an <code>.osm</code> file with the buildings you care about.
+          </li>
+          <li>
+            Run the converter script:
+            <pre><code>python osm_to_3dm.py input.osm output.3dm</code></pre>
+          </li>
+        </ol>
+        <p>
+          Flags such as <code>--default-height</code> and
+          <code>--level-height</code> let you tweak how missing OSM attributes are
+          interpreted.
+        </p>
+      </section>
+
+      <section>
+        <h2>Troubleshooting GitHub Pages</h2>
+        <p>
+          To make sure this page shows up at
+          <code>https://&lt;username&gt;.github.io/osm-to-3dm/</code>:
+        </p>
+        <ol>
+          <li>
+            In your repository settings, open the “Pages” section.
+          </li>
+          <li>
+            Under <strong>Build and deployment</strong>, choose
+            <strong>Deploy from a branch</strong>.
+          </li>
+          <li>
+            Pick the <strong>main</strong> branch and the
+            <strong>/ (root)</strong> folder, then hit <strong>Save</strong>.
+          </li>
+          <li>
+            GitHub rebuilds the site and serves this <code>index.html</code>.
+            That usually takes less than a minute.
+          </li>
+        </ol>
+        <p>
+          If you already had Pages enabled, trigger a rebuild by making a fresh
+          commit or using the “Retry” button inside the Pages settings panel.
+        </p>
+      </section>
+
+      <footer>
+        <p>
+          Need more detail? Check the
+          <a href="https://github.com/stjur/osm-to-3dm">project README</a> for
+          CLI flags, supported tags, and implementation notes.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

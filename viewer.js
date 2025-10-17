@@ -17,7 +17,11 @@ let downloadName = 'buildings.3dm';
 async function ensureRhino() {
   if (rhino) return rhino;
   setStatus('Loading Rhino3dm…');
-  rhino = await rhino3dm();
+  const factory = window.rhino3dm || globalThis.rhino3dm;
+  if (typeof factory !== 'function') {
+    throw new Error('Rhino3dm library failed to load.');
+  }
+  rhino = await factory();
   return rhino;
 }
 

@@ -253,6 +253,7 @@ def extract_relation_features(
     if not way_roles["outer"]:
         return []
 
+
     features: List[Feature] = []
     for ring_node_ids in assemble_rings(way_roles["outer"]):
         try:

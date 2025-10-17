@@ -36,3 +36,12 @@ The script extracts polygons and multipolygons, reads `height` and
 avoid projection distortions, and writes one extrusion per footprint to the
 output 3DM file. Basic metadata (such as the source OSM identifier and the
 projection origin) is embedded into the file for future reference.
+
+## GitHub Pages quick-start
+
+If you want a simple landing page at
+`https://<username>.github.io/osm-to-3dm/`, point GitHub Pages to the `main`
+branch and root folder. This repository now includes an `index.html` file that
+walks through the installation and usage steps above and explains how to retry a
+failed GitHub Pages build. After saving the Pages settings, GitHub will deploy
+the site automatically.

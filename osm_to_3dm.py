@@ -20,17 +20,26 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
+from typing import Dict, IO, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
-import rhino3dm
+try:
+    import rhino3dm
+except ImportError as exc:  # pragma: no cover - dependency guidance
+    raise ImportError(
+        "The 'rhino3dm' package is required. Install it with 'pip install rhino3dm'."
+    ) from exc
 
 # Average storey height used when only ``building:levels`` is available.
 DEFAULT_LEVEL_HEIGHT = 3.0
 # Height used whenever a geometry is missing explicit height information.
 DEFAULT_BUILDING_HEIGHT = 10.0
+
+
+OSMSource = Union[Path, str, bytes, IO[bytes]]
 
 
 @dataclass
@@ -66,14 +75,19 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def parse_osm(path: Path) -> Tuple[
+def parse_osm(source: OSMSource) -> Tuple[
     Dict[int, Tuple[float, float]],
     Dict[int, Tuple[List[int], Dict[str, str]]],
     Dict[int, Tuple[List[Tuple[str, int, str]], Dict[str, str]]],
 ]:
     """Parse the OSM XML document and return nodes, ways and relations."""
 
-    tree = ET.parse(path)
+    if isinstance(source, bytes):
+        tree = ET.ElementTree(ET.fromstring(source))
+    elif hasattr(source, "read"):
+        tree = ET.parse(source)  # type: ignore[arg-type]
+    else:
+        tree = ET.parse(source)  # type: ignore[arg-type]
     root = tree.getroot()
     nodes: Dict[int, Tuple[float, float]] = {}
     ways: Dict[int, Tuple[List[int], Dict[str, str]]] = {}
@@ -555,22 +569,70 @@ def build_model(
     return model
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = parse_args(argv)
+def convert_osm_to_model(
+    osm_source: OSMSource,
+    *,
+    default_height: float = DEFAULT_BUILDING_HEIGHT,
+    level_height: float = DEFAULT_LEVEL_HEIGHT,
+) -> rhino3dm.File3dm:
+    """Create a Rhino model from an OSM XML source."""
 
-    nodes, ways, relations = parse_osm(args.input)
+    nodes, ways, relations = parse_osm(osm_source)
     features = collect_features(nodes, ways, relations)
     if not features:
-        print("No buildings found in input", file=sys.stderr)
-        return 1
+        raise ValueError("No buildings found in input")
 
     origin = determine_origin(features)
-    model = build_model(
+    return build_model(
         features,
         origin,
-        default_height=args.default_height,
-        level_height=args.level_height,
+        default_height=default_height,
+        level_height=level_height,
     )
+
+
+def _model_to_3dm_bytes(model: rhino3dm.File3dm, version: int) -> bytes:
+    """Serialize a Rhino model to bytes using a temporary file."""
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_path = Path(tmpdir) / "output.3dm"
+        if not model.Write(str(temp_path), version):
+            raise RuntimeError("Failed to serialize 3DM model")
+        return temp_path.read_bytes()
+
+
+def convert_osm_to_3dm_bytes(
+    osm_source: OSMSource,
+    *,
+    default_height: float = DEFAULT_BUILDING_HEIGHT,
+    level_height: float = DEFAULT_LEVEL_HEIGHT,
+    version: int = 7,
+) -> bytes:
+    """Convert an OSM XML source into 3DM bytes."""
+
+    model = convert_osm_to_model(
+        osm_source,
+        default_height=default_height,
+        level_height=level_height,
+    )
+    return _model_to_3dm_bytes(model, version)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
+    try:
+        model = convert_osm_to_model(
+            args.input,
+            default_height=args.default_height,
+            level_height=args.level_height,
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"Conversion failed: {exc}", file=sys.stderr)
+        return 1
+
     if not model.Write(str(args.output), 7):
         print(f"Failed to write 3DM file to {args.output}", file=sys.stderr)
         return 1

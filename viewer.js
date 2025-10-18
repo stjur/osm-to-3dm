@@ -10,14 +10,57 @@ let scene;
 let camera;
 let controls;
 let rhino;
+let rhinoFactoryPromise;
 let currentGroup;
 let currentDoc;
 let downloadName = 'buildings.3dm';
 
+async function waitForRhinoFactory() {
+  const existing = window.rhino3dm || globalThis.rhino3dm;
+  if (typeof existing === 'function') {
+    return existing;
+  }
+
+  if (!rhinoFactoryPromise) {
+    const rhinoScript = Array.from(document.scripts).find((script) =>
+      /rhino3dm/i.test(script.src || '')
+    );
+
+    if (!rhinoScript) {
+      throw new Error('Rhino3dm script tag is missing from the page.');
+    }
+
+    rhinoFactoryPromise = new Promise((resolve, reject) => {
+      const handleLoad = () => {
+        const factory = window.rhino3dm || globalThis.rhino3dm;
+        if (typeof factory === 'function') {
+          resolve(factory);
+        } else {
+          reject(new Error('Rhino3dm library finished loading but did not expose its factory.'));
+        }
+      };
+
+      const handleError = () => {
+        reject(new Error('Failed to download the Rhino3dm library.'));
+      };
+
+      rhinoScript.addEventListener('load', handleLoad, { once: true });
+      rhinoScript.addEventListener('error', handleError, { once: true });
+
+      if (rhinoScript.readyState === 'complete' || rhinoScript.readyState === 'loaded') {
+        handleLoad();
+      }
+    });
+  }
+
+  return rhinoFactoryPromise;
+}
+
 async function ensureRhino() {
   if (rhino) return rhino;
   setStatus('Loading Rhino3dm…');
-  rhino = await rhino3dm();
+  const factory = await waitForRhinoFactory();
+  rhino = await factory();
   return rhino;
 }
 

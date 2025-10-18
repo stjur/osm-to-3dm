@@ -13,22 +13,22 @@
       body {
         margin: 0;
         padding: 0;
-        background: radial-gradient(circle at top, rgba(53, 132, 228, 0.15), transparent 55%),
-          linear-gradient(180deg, rgba(240, 240, 240, 0.6), transparent 60%);
+        background: radial-gradient(circle at top, rgba(53, 132, 228, 0.2), transparent 55%),
+          linear-gradient(180deg, rgba(240, 240, 240, 0.7), transparent 60%);
       }
       main {
-        max-width: 760px;
+        max-width: 720px;
         margin: 0 auto;
         padding: 3rem 1.5rem 4rem;
       }
       h1 {
         font-size: clamp(2rem, 5vw, 2.8rem);
-        margin-bottom: 0.25em;
+        margin-bottom: 0.35em;
       }
       h2 {
-        font-size: clamp(1.4rem, 3.5vw, 1.8rem);
+        font-size: clamp(1.4rem, 3.5vw, 1.85rem);
         margin-top: 2.5rem;
-        border-bottom: 2px solid rgba(53, 132, 228, 0.25);
+        border-bottom: 2px solid rgba(53, 132, 228, 0.35);
         padding-bottom: 0.35rem;
       }
       p {
@@ -44,7 +44,7 @@
         border-radius: 0.35rem;
       }
       pre {
-        background: rgba(12, 18, 28, 0.85);
+        background: rgba(12, 18, 28, 0.88);
         color: #f4f7ff;
         padding: 1rem 1.25rem;
         border-radius: 0.5rem;
@@ -54,7 +54,7 @@
         color: #2a6bf2;
       }
       .callout {
-        background: rgba(53, 132, 228, 0.12);
+        background: rgba(53, 132, 228, 0.18);
         border-left: 4px solid rgba(53, 132, 228, 0.65);
         padding: 1rem 1.25rem;
         border-radius: 0.5rem;
@@ -67,22 +67,22 @@
       }
       @media (prefers-color-scheme: dark) {
         body {
-          background: radial-gradient(circle at top, rgba(38, 112, 202, 0.3), transparent 60%),
-            linear-gradient(180deg, rgba(32, 37, 48, 0.75), rgba(17, 20, 27, 0.95));
+          background: radial-gradient(circle at top, rgba(38, 112, 202, 0.35), transparent 60%),
+            linear-gradient(180deg, rgba(32, 37, 48, 0.85), rgba(17, 20, 27, 0.95));
           color: #f8fbff;
         }
         h2 {
-          border-bottom-color: rgba(102, 154, 247, 0.45);
+          border-bottom-color: rgba(102, 154, 247, 0.5);
         }
         a {
           color: #92b7ff;
         }
         .callout {
-          background: rgba(74, 118, 212, 0.2);
+          background: rgba(74, 118, 212, 0.28);
           border-left-color: rgba(110, 162, 255, 0.9);
         }
         footer {
-          color: rgba(255, 255, 255, 0.55);
+          color: rgba(255, 255, 255, 0.6);
         }
       }
     </style>
@@ -92,100 +92,68 @@
       <header>
         <h1>osm-to-3dm converter</h1>
         <p>
-          A tiny utility that turns OpenStreetMap building footprints into Rhino
-          <code>.3dm</code> volumes.
+          Convert OpenStreetMap building footprints into Rhino <code>.3dm</code> volumes
+          using a lightweight Python utility.
         </p>
       </header>
 
       <section class="callout">
         <p>
-          Drop an OpenStreetMap <code>.osm</code> file onto the
-          <a href="viewer.html">browser converter</a> to generate a Rhino
-          <code>.3dm</code> model instantly. Everything stays on your device —
-          no uploads, no installs.
+          Prefer a graphical workflow? Run <code>python web_converter.py</code> and open
+          <code>http://127.0.0.1:8000/</code> to use the drag-and-drop converter in your browser.
         </p>
       </section>
 
       <section>
-        <h2>Convert directly in your browser</h2>
+        <h2>Install the dependency</h2>
+        <p>
+          Both the command-line converter and the local web interface use the
+          <a href="https://github.com/mcneel/rhino3dm">rhino3dm</a> package.
+          Install it with:
+        </p>
+        <pre><code>pip install rhino3dm</code></pre>
+      </section>
+
+      <section>
+        <h2>Run the command-line converter</h2>
         <ol>
           <li>
             Export an <code>.osm</code> file that includes
-            <code>building</code> or <code>building:part</code> geometry from
+            <code>building</code> or <code>building:part</code> features from
             <a href="https://www.openstreetmap.org/export">openstreetmap.org</a>.
           </li>
           <li>
-            Open the <a href="viewer.html">web converter</a> and drop the file
-            onto the page.
-          </li>
-          <li>
-            Wait a moment for the conversion to finish, then hit “Download 3DM”
-            to save the Rhino model.
-          </li>
-        </ol>
-        <p>
-          The conversion runs entirely in your browser using WebAssembly — large
-          files never leave your machine.
-        </p>
-      </section>
-
-      <section>
-        <h2>Prefer the command line?</h2>
-        <ol>
-          <li>
-            Install the <a href="https://github.com/mcneel/rhino3dm">rhino3dm</a>
-            Python bindings:
-            <pre><code>pip install rhino3dm</code></pre>
-          </li>
-          <li>
-            Export an <code>.osm</code> file with the buildings you care about.
-          </li>
-          <li>
-            Run the converter script:
+            Convert the export into a Rhino file:
             <pre><code>python osm_to_3dm.py input.osm output.3dm</code></pre>
           </li>
+          <li>
+            Optional flags such as <code>--default-height</code> and
+            <code>--level-height</code> let you tune how missing attributes are interpreted.
+          </li>
         </ol>
         <p>
-          Flags such as <code>--default-height</code> and
-          <code>--level-height</code> let you tweak how missing OSM attributes are
-          interpreted.
+          The converter keeps building footprints, projects them to a local tangent plane to
+          minimise distortion, and extrudes them using <code>height</code>,
+          <code>min_height</code>, or <code>building:levels</code> tags.
         </p>
       </section>
 
       <section>
-        <h2>Troubleshooting GitHub Pages</h2>
-        <p>
-          To make sure this page shows up at
-          <code>https://&lt;username&gt;.github.io/osm-to-3dm/</code>:
-        </p>
+        <h2>Use the local drag-and-drop server</h2>
         <ol>
-          <li>
-            In your repository settings, open the “Pages” section.
-          </li>
-          <li>
-            Under <strong>Build and deployment</strong>, choose
-            <strong>Deploy from a branch</strong>.
-          </li>
-          <li>
-            Pick the <strong>main</strong> branch and the
-            <strong>/ (root)</strong> folder, then hit <strong>Save</strong>.
-          </li>
-          <li>
-            GitHub rebuilds the site and serves this <code>index.html</code>.
-            That usually takes less than a minute.
-          </li>
+          <li>Start the server: <pre><code>python web_converter.py --port 8000</code></pre></li>
+          <li>Open <code>http://127.0.0.1:8000/</code> in your browser.</li>
+          <li>Drop an exported <code>.osm</code> file to receive the converted <code>.3dm</code>.</li>
         </ol>
         <p>
-          If you already had Pages enabled, trigger a rebuild by making a fresh
-          commit or using the “Retry” button inside the Pages settings panel.
+          Files never leave your machine — the Python server performs the conversion locally
+          using the same logic as the CLI.
         </p>
       </section>
 
       <footer>
         <p>
-          Need more detail? Check the
-          <a href="https://github.com/stjur/osm-to-3dm">project README</a> for
-          CLI flags, supported tags, and implementation notes.
+          Licensed under the MIT License. Contributions and bug reports are welcome!
         </p>
       </footer>
     </main>

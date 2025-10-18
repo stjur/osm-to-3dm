@@ -36,12 +36,12 @@ header .hint {
   color: rgba(30, 30, 30, 0.65);
 }
 
-
 .actions {
   margin: 1.5rem auto;
   display: flex;
   justify-content: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .upload {
@@ -57,6 +57,18 @@ header .hint {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.upload input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(42, 107, 242, 0.25);
 }
 
 .ghost {
@@ -81,36 +93,24 @@ header .hint {
   box-shadow: 0 12px 30px rgba(42, 107, 242, 0.2);
 }
 
-.upload:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(42, 107, 242, 0.25);
-}
-
-.upload input[type="file"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-
 main {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 clamp(1rem, 4vw, 2rem) 2rem;
+  padding: 0 clamp(1rem, 4vw, 2rem) 2.5rem;
+  gap: 1.75rem;
 }
 
 #dropZone {
   border: 2px dashed rgba(42, 107, 242, 0.5);
   border-radius: 1rem;
   padding: 2rem;
-  margin-bottom: 1.5rem;
   text-align: center;
   width: min(640px, 100%);
   color: rgba(30, 30, 30, 0.7);
   background: rgba(53, 132, 228, 0.08);
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 body.drag-over #dropZone {
@@ -118,12 +118,20 @@ body.drag-over #dropZone {
   border-color: #2a6bf2;
 }
 
-#viewport {
-  width: min(960px, 100%);
-  aspect-ratio: 16 / 10;
+#status {
+  width: min(640px, 100%);
+  padding: 1.25rem 1.5rem;
   border-radius: 1rem;
-  background: rgba(8, 12, 18, 0.95);
-  box-shadow: 0 20px 50px rgba(12, 18, 28, 0.55);
+  background: rgba(12, 18, 28, 0.85);
+  color: #f4f7ff;
+  box-shadow: 0 18px 40px rgba(12, 18, 28, 0.45);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+#status.error {
+  background: rgba(191, 24, 24, 0.85);
+  box-shadow: 0 18px 40px rgba(191, 24, 24, 0.35);
 }
 
 footer {
@@ -149,7 +157,7 @@ footer a {
   }
 
   #dropZone {
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.85);
     background: rgba(74, 118, 212, 0.15);
   }
 

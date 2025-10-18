@@ -7,14 +7,13 @@ volumes.
 ## Convert in your browser
 
 The repository ships with a WebAssembly-powered converter so you can try the
-workflow without installing anything: 
+workflow without installing anything:
 
 1. Export an area from OpenStreetMap that contains `building=*` or
    `building:part=*` features.
 2. Open [`viewer.html`](viewer.html) (or the published GitHub Pages site) in a
    modern browser.
-3. Drop the exported `.osm` file onto the page. The converter extrudes the
-   buildings, previews them in 3D, and lets you download the resulting Rhino
+3. Drop the exported `.osm` file onto the page and download the generated Rhino
    `.3dm` file.
 
 All processing happens locally in the browser; files never leave your device.
@@ -53,7 +52,7 @@ output 3DM file. Basic metadata (such as the source OSM identifier and the
 projection origin) is embedded into the file for future reference.
 
 Whether you convert in the browser or via the CLI, you can use `viewer.html`
-to preview the resulting `.3dm` file directly in your browser.
+to run the same conversion logic without installing anything.
 
 ## GitHub Pages quick-start
 

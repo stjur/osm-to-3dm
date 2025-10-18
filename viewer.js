@@ -46,24 +46,36 @@ function ensureRhinoScript() {
   if (existing) {
     setRhinoScriptBase(existing);
     rhinoFactoryPromise = new Promise((resolve, reject) => {
-      const handleLoad = () => {
-        cleanup();
+      const cleanup = () => {
+        existing.removeEventListener('load', handleLoad);
+        existing.removeEventListener('error', handleError);
+      };
+      const resolveFactory = () => {
         if (typeof window.rhino3dm === 'function') {
+          cleanup();
           resolve(window.rhino3dm);
-        } else {
-          reject(new Error('Rhino3dm script loaded but no factory was exported.'));
+          return true;
         }
+        return false;
+      };
+      const handleLoad = () => {
+        if (resolveFactory()) return;
+        cleanup();
+        reject(new Error('Rhino3dm script loaded but no factory was exported.'));
       };
       const handleError = () => {
         cleanup();
         reject(new Error('Failed to load the Rhino3dm script.'));
       };
-      const cleanup = () => {
-        existing.removeEventListener('load', handleLoad);
-        existing.removeEventListener('error', handleError);
-      };
+
       existing.addEventListener('load', handleLoad, { once: true });
       existing.addEventListener('error', handleError, { once: true });
+
+      if (!resolveFactory() && (existing.readyState === 'complete' || existing.readyState === 'loaded')) {
+        // If the script finished loading before the listeners were attached,
+        // run the load handler once to settle the promise.
+        handleLoad();
+      }
     });
     rhinoFactoryPromise = rhinoFactoryPromise.catch((error) => {
       rhinoFactoryPromise = null;
@@ -80,24 +92,34 @@ function ensureRhinoScript() {
   setRhinoScriptBase(script);
 
   rhinoFactoryPromise = new Promise((resolve, reject) => {
-    const handleLoad = () => {
-      cleanup();
+    const cleanup = () => {
+      script.removeEventListener('load', handleLoad);
+      script.removeEventListener('error', handleError);
+    };
+    const resolveFactory = () => {
       if (typeof window.rhino3dm === 'function') {
+        cleanup();
         resolve(window.rhino3dm);
-      } else {
-        reject(new Error('Rhino3dm script loaded but no factory was exported.'));
+        return true;
       }
+      return false;
+    };
+    const handleLoad = () => {
+      if (resolveFactory()) return;
+      cleanup();
+      reject(new Error('Rhino3dm script loaded but no factory was exported.'));
     };
     const handleError = () => {
       cleanup();
       reject(new Error('Failed to load the Rhino3dm script.'));
     };
-    const cleanup = () => {
-      script.removeEventListener('load', handleLoad);
-      script.removeEventListener('error', handleError);
-    };
+
     script.addEventListener('load', handleLoad, { once: true });
     script.addEventListener('error', handleError, { once: true });
+
+    if (!resolveFactory() && (script.readyState === 'complete' || script.readyState === 'loaded')) {
+      handleLoad();
+    }
   });
 
   rhinoFactoryPromise = rhinoFactoryPromise.catch((error) => {

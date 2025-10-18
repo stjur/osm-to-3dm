@@ -97,8 +97,14 @@ async function waitForRhinoFactory() {
 async function ensureRhino() {
   if (rhino) return rhino;
   setStatus('Loading Rhino3dm…');
-  const { factory, scriptUrl } = await waitForRhinoFactory();
-  const baseUrl = scriptUrl || window.location.href;
+  const factory = window.rhino3dm || globalThis.rhino3dm;
+  if (typeof factory !== 'function') {
+    throw new Error('Rhino3dm library is not available on the page.');
+  }
+  const rhinoScript = Array.from(document.scripts).find((script) =>
+    /rhino3dm/i.test(script.src || '')
+  );
+  const baseUrl = rhinoScript?.src || window.location.href;
   try {
     rhino = await factory({
       locateFile: (path) => new URL(path, baseUrl).toString()

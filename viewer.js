@@ -5,113 +5,142 @@ const fileInput = document.getElementById('fileInput');
 const dropZone = document.getElementById('dropZone');
 const downloadBtn = document.getElementById('downloadBtn');
 
+const RHINO_CDN_BASE = 'https://cdn.jsdelivr.net/npm/rhino3dm@8.7.0/';
+
 let renderer;
 let scene;
 let camera;
 let controls;
 let rhino;
 let rhinoFactoryPromise;
-let rhinoScriptSource;
+let rhinoScriptBase;
 let currentGroup;
 let currentDoc;
 let downloadName = 'buildings.3dm';
+
+function setRhinoScriptBase(script) {
+  if (rhinoScriptBase || !script?.src) return;
+  try {
+    const scriptUrl = new URL(script.src, window.location.href);
+    rhinoScriptBase = new URL('.', scriptUrl).toString();
+  } catch (error) {
+    console.warn('Failed to resolve Rhino script base URL.', error);
+  }
+}
 
 function findRhinoScript() {
   return Array.from(document.scripts).find((script) => /rhino3dm/i.test(script.src || ''));
 }
 
-async function waitForRhinoFactory() {
-  const existing = window.rhino3dm || globalThis.rhino3dm;
-  if (typeof existing === 'function') {
-    if (!rhinoScriptSource) {
-      const script = findRhinoScript();
-      rhinoScriptSource = script?.src || window.location.href;
-    }
-    return { factory: existing, scriptUrl: rhinoScriptSource };
+function ensureRhinoScript() {
+  if (typeof window.rhino3dm === 'function') {
+    setRhinoScriptBase(findRhinoScript());
+    return Promise.resolve(window.rhino3dm);
   }
 
-  if (!rhinoFactoryPromise) {
-    const rhinoScript = findRhinoScript();
+  if (rhinoFactoryPromise) {
+    return rhinoFactoryPromise;
+  }
 
-    if (!rhinoScript) {
-      throw new Error('Rhino3dm script tag is missing from the page.');
-    }
-
+  const existing = findRhinoScript();
+  if (existing) {
+    setRhinoScriptBase(existing);
     rhinoFactoryPromise = new Promise((resolve, reject) => {
-      let pollId = null;
-
-      const cleanup = () => {
-        if (pollId !== null) {
-          window.clearInterval(pollId);
-          pollId = null;
-        }
-        rhinoScript.removeEventListener('load', handleLoad);
-        rhinoScript.removeEventListener('error', handleError);
-      };
-
-      const resolveFactory = () => {
-        const factory = window.rhino3dm || globalThis.rhino3dm;
-        if (typeof factory === 'function') {
-          rhinoScriptSource = rhinoScript.src || window.location.href;
-          cleanup();
-          resolve({ factory, scriptUrl: rhinoScriptSource });
-          return true;
-        }
-        return false;
-      };
-
-      const fail = (error) => {
+      const handleLoad = () => {
         cleanup();
-        rhinoFactoryPromise = null;
-        reject(error);
-      };
-
-      function handleLoad() {
-        if (resolveFactory()) return;
-        fail(new Error('Rhino3dm library finished loading but did not expose its factory.'));
-      }
-
-      function handleError() {
-        fail(new Error('Failed to download the Rhino3dm library.'));
-      }
-
-      if (resolveFactory()) {
-        return;
-      }
-
-      rhinoScript.addEventListener('load', handleLoad, { once: true });
-      rhinoScript.addEventListener('error', handleError, { once: true });
-
-      pollId = window.setInterval(() => {
-        if (resolveFactory()) {
-          window.clearInterval(pollId);
-          pollId = null;
+        if (typeof window.rhino3dm === 'function') {
+          resolve(window.rhino3dm);
+        } else {
+          reject(new Error('Rhino3dm script loaded but no factory was exported.'));
         }
-      }, 50);
+      };
+      const handleError = () => {
+        cleanup();
+        reject(new Error('Failed to load the Rhino3dm script.'));
+      };
+      const cleanup = () => {
+        existing.removeEventListener('load', handleLoad);
+        existing.removeEventListener('error', handleError);
+      };
+      existing.addEventListener('load', handleLoad, { once: true });
+      existing.addEventListener('error', handleError, { once: true });
     });
+    rhinoFactoryPromise = rhinoFactoryPromise.catch((error) => {
+      rhinoFactoryPromise = null;
+      throw error;
+    });
+    return rhinoFactoryPromise;
   }
+
+  const script = document.createElement('script');
+  script.src = `${RHINO_CDN_BASE}rhino3dm.min.js`;
+  script.async = true;
+  script.crossOrigin = 'anonymous';
+  document.head.appendChild(script);
+  setRhinoScriptBase(script);
+
+  rhinoFactoryPromise = new Promise((resolve, reject) => {
+    const handleLoad = () => {
+      cleanup();
+      if (typeof window.rhino3dm === 'function') {
+        resolve(window.rhino3dm);
+      } else {
+        reject(new Error('Rhino3dm script loaded but no factory was exported.'));
+      }
+    };
+    const handleError = () => {
+      cleanup();
+      reject(new Error('Failed to load the Rhino3dm script.'));
+    };
+    const cleanup = () => {
+      script.removeEventListener('load', handleLoad);
+      script.removeEventListener('error', handleError);
+    };
+    script.addEventListener('load', handleLoad, { once: true });
+    script.addEventListener('error', handleError, { once: true });
+  });
+
+  rhinoFactoryPromise = rhinoFactoryPromise.catch((error) => {
+    rhinoFactoryPromise = null;
+    throw error;
+  });
 
   return rhinoFactoryPromise;
+}
+
+function withTimeout(promise, timeout, message) {
+  const tracked = Promise.resolve(promise);
+  return Promise.race([
+    tracked,
+    new Promise((_, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(message));
+      }, timeout);
+      tracked.finally(() => clearTimeout(timer));
+    })
+  ]);
 }
 
 async function ensureRhino() {
   if (rhino) return rhino;
   setStatus('Loading Rhino3dm…');
-  const factory = window.rhino3dm || globalThis.rhino3dm;
-  if (typeof factory !== 'function') {
-    throw new Error('Rhino3dm library is not available on the page.');
-  }
-  const rhinoScript = Array.from(document.scripts).find((script) =>
-    /rhino3dm/i.test(script.src || '')
+  const factory = await withTimeout(
+    ensureRhinoScript(),
+    15000,
+    'Timed out loading the Rhino3dm library. Check your connection.'
   );
-  const baseUrl = rhinoScript?.src || window.location.href;
+  const baseUrl = rhinoScriptBase || RHINO_CDN_BASE;
   try {
-    rhino = await factory({
-      locateFile: (path) => new URL(path, baseUrl).toString()
-    });
+    rhino = await withTimeout(
+      factory({
+        locateFile: (path) => new URL(path, baseUrl).toString()
+      }),
+      15000,
+      'Timed out initializing Rhino3dm. Please reload and try again.'
+    );
   } catch (error) {
     console.error('Failed to initialize Rhino3dm.', error);
-    throw new Error('Rhino3dm library failed to load.');
+    throw (error instanceof Error ? error : new Error('Rhino3dm library failed to load.'));
   }
   return rhino;
 }
@@ -318,7 +347,7 @@ async function loadArrayBuffer(buffer, filename) {
     }
   } catch (error) {
     console.error(error);
-    setStatus('Failed to load the file. Check the console for details.');
+    setStatus(error.message || 'Failed to load the file. Check the console for details.');
     setDownloadDoc(null);
   }
 }

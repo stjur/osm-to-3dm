@@ -1,3 +1,4 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/README.md b/README.md
 index bc16a6257d83fc679d6dd0fb51beb56f989efa58..74e0a22a8233ec0bc398addfba906c4dff57a00b 100644
 --- a/README.md
@@ -87,3 +88,6 @@ index bc16a6257d83fc679d6dd0fb51beb56f989efa58..74e0a22a8233ec0bc398addfba906c4d
 +Then open <http://127.0.0.1:8000/> and drop an exported `.osm` file. The server
 +processes the upload locally (nothing ever leaves your machine) and returns the
 +converted `.3dm` file for download.
+ 
+EOF
+)
